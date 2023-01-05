@@ -1,6 +1,6 @@
 use std::{io::Read, ops::Add};
 use rand::Rng;
-
+use crate::gpu;
 //The CPU of the Chip8
 pub struct Cpu
 {
@@ -23,7 +23,9 @@ pub struct Cpu
     I:u16,
 
     // The current opcode where the PC is
-    currOpcode:u16
+    currOpcode:u16,
+
+
 }
 
 // All CPU methods
@@ -231,11 +233,16 @@ impl Cpu
     // For drawing on screen
     fn DRW_Vx_Vy(&mut self, n:u8)
     {
-        let mut bytes:Vec<u8> = vec![0, n];
-        for i in 0..(n+1)
-        {
-            bytes.push(self.RAM[(self.I as u8 + i) as usize]);
-        }
+
+        
+
+
+
+        // let mut bytes:Vec<u8> = vec![0, n];
+        // for i in 0..(n+1)
+        // {
+        //     bytes.push(self.RAM[(self.I as u8 + i) as usize]);
+        // }
 
         //TODO draw bytes
     }
