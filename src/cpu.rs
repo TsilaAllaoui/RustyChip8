@@ -101,6 +101,7 @@ impl Cpu
         let pc = self.PC;
         self.fetch(pc);
         self.decodeAndExecute();
+        self.debuggerStep();
     }
 
     // Fetch current opcode pointed by the PC
@@ -131,7 +132,7 @@ impl Cpu
            0x3000 => self.SE_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
 
            // For the 0x6FFF opcodes
-           0x6000 => self.LD_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, self.fecthByte(self.PC + 3)),
+           0x6000 => self.LD_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
 
            // For the 0x7FFF opcodes
            0x7000 => self.ADD_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
@@ -151,6 +152,21 @@ impl Cpu
                 std::process::exit(1);
             }
         }
+    }
+
+    // Debugger
+    pub fn debuggerStep(&mut self)
+    {
+        println!("PC={:#04x}", self.PC);
+        println!("SP={:#04x}", self.SP);
+        println!("Opcode={:#04x}", self.currOpcode);
+        println!("I={:#04x}", self.I);
+        println!("Registers:");
+        for i in 0..16
+        {
+            print!("{:#04x}  ", self.Registers[i as usize]);
+        }
+        println!("");
     }
 
     // Decode current opcode pointed by the PC
@@ -200,7 +216,7 @@ impl Cpu
     {
         let mut rng = rand::thread_rng();
         let randomVal:u8 = rng.gen_range(0, 255);
-        self.Registers[index as usize] = randomVal & val;
+        self.Registers[index as usize] = 0x1;//randomVal & val;
     }
 
     // Check if Vx is equal to val and increment PC by 2
@@ -208,7 +224,7 @@ impl Cpu
     {
         if self.Registers[index as usize] == val
         {
-            self.PC = self.PC + 4;
+            self.PC = self.PC + 2;
         }
     }
 
@@ -235,7 +251,7 @@ impl Cpu
             None => 
             {
                 println!("Overflow occured in ADD_Vx function!");
-                println!("PC={:#04x}", self.PC);
+                println!("PC={:#04x}", self.PC - 2);
                 println!("Opcode={:#04x}", self.currOpcode);
                 std::process::exit(1);
             }
