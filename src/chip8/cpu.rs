@@ -1,7 +1,13 @@
-use std::{io::Read, ops::Add};
+// Importing useful modules
+use std::{io::Read, ops::Add, vec};
 use rand::Rng;
 use crate::gpu;
-//The CPU of the Chip8
+
+// Colors
+const BLACK:[f32;4] = [0.0,0.0,0.0,1.0];
+const WHITE:[f32;4] = [1.0,1.0,1.0,1.0];
+
+// The CPU of the Chip8
 pub struct Cpu
 {
     // The Program Counter 5PC)
@@ -25,7 +31,8 @@ pub struct Cpu
     // The current opcode where the PC is
     currOpcode:u16,
 
-
+    // The screen buffer
+    screenBuffer:Vec<Vec<[f32;4]>>
 }
 
 // All CPU methods
@@ -37,14 +44,18 @@ impl Cpu
         // Read rom file
         let mut rom = match std::fs::File::open("C:/Users/735/Desktop/RustyChip8/roms/maze.ch8") 
         {
-            Ok(rom) => rom, // If the file was successfully opened, return the file object
+            // If the file was successfully opened, return the file object
+            Ok(rom) => rom,
+
+            // If there was an error opening the file, handle the error
             Err(error) => 
-            { // If there was an error opening the file, handle the error
+            { 
                 eprint!("Error: {}", error);
                 std::process::exit(1);
             }
         };
 
+        // Reading rom file byte per byte to vector
         let mut buffer:Vec<u8> = Vec::new();
         rom.read_to_end(&mut buffer);
 
@@ -56,6 +67,7 @@ impl Cpu
             i = i + 1;
         }
 
+        // Loading fonts to memory
         pub const CHIP8_FONT_SET: [u8; 80] = 
         [
             0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -83,6 +95,7 @@ impl Cpu
             i = i + 1;
         }
 
+        // Creating new instance of a CPU from all these parameters
         let _cpu = Cpu 
         {
             PC:0x200,
@@ -91,19 +104,22 @@ impl Cpu
             RAM:_RAM,
             Registers:vec![0;16],
             I:0,
-            currOpcode:0
+            currOpcode:0,
+            screenBuffer:vec![vec![[0.1,0.1,0.1,1.0];32];68]
         };
         
         return _cpu;
     }
 
-    // To run the cpu
+    // A CPU step
     pub fn run(&mut self)
     {
+        // Fetch
         let pc = self.PC;
         self.fetch(pc);
+
+        // Decode and Execute
         self.decodeAndExecute();
-        self.debuggerStep();
     }
 
     // Fetch current opcode pointed by the PC
@@ -146,7 +162,9 @@ impl Cpu
            0xC000 => self.RND_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
 
            // For the 0xDFFF opcodes
-           0xD000 => self.DRW_Vx_Vy((self.currOpcode & 0x000F) as u8),
+           0xD000 => self.DRW_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8,
+                                    ((self.currOpcode & 0x00F0) >> 4) as u8,
+                                    (self.currOpcode & 0x000F) as u8),
 
             _ => 
             {
@@ -156,8 +174,8 @@ impl Cpu
         }
     }
 
-    // Debugger
-    pub fn debuggerStep(&mut self)
+    // Debugger step
+    pub fn debuggerStep(&self)
     {
         println!("PC={:#04x}", self.PC);
         println!("SP={:#04x}", self.SP);
@@ -171,13 +189,12 @@ impl Cpu
         println!("");
     }
 
-    // Decode current opcode pointed by the PC
+    // Fetch byte pointed by the PC
     pub fn fetch(&mut self, adress:u16)
     {
         self.currOpcode = ((((self.RAM[(adress) as usize]) as u16) << 8) as u16) | (self.RAM[(adress + 1) as usize] as u16);
         self.PC = self.PC + 2;
     }
-
 
     //Fetch a byte in memory
     pub fn fecthByte(&self, adress:u16) -> u8
@@ -186,9 +203,9 @@ impl Cpu
     }
 
     // Clearing screen
-    fn CLS(&self)
+    fn CLS(&mut self)
     {
-
+        self.screenBuffer = vec![vec![[0.0,0.0,0.0,1.0];32];68]
     }
 
     // Return from subroutine
@@ -218,7 +235,7 @@ impl Cpu
     {
         let mut rng = rand::thread_rng();
         let randomVal:u8 = rng.gen_range(0, 255);
-        self.Registers[index as usize] = 0x1;//randomVal & val;
+        self.Registers[index as usize] = randomVal & val;
     }
 
     // Check if Vx is equal to val and increment PC by 2
@@ -231,20 +248,36 @@ impl Cpu
     }
 
     // For drawing on screen
-    fn DRW_Vx_Vy(&mut self, n:u8)
+    fn DRW_Vx_Vy(&mut self,x:u8, y:u8, n:u8)
     {
+        // Position where to begin rendering the curretn sprite
+        let posx = self.Registers[x as usize];
+        let posy = self.Registers[y as usize];
 
-        
+        // For checking collision (TODO: add collision check)
+        self.Registers[15] = 0;
 
+        // Looping througth hight
+        for i in 0..n
+        {
+            // Getting the current byte pointed at I + current row
+            let adress:u16 = self.I + i as u16;
+            let byte = self.RAM[adress as usize];
 
-
-        // let mut bytes:Vec<u8> = vec![0, n];
-        // for i in 0..(n+1)
-        // {
-        //     bytes.push(self.RAM[(self.I as u8 + i) as usize]);
-        // }
-
-        //TODO draw bytes
+            // Looping throught columns of 8 pixels (each bit is a pixel, 1 = black, 0 = white)
+            for j in (0..8).rev()
+            {
+                let a = byte & (1 << j);
+                if (a >> j) == 1
+                {
+                    self.screenBuffer[((7-j) + posx) as usize][(posy + i) as usize] = BLACK;
+                }
+                else 
+                {
+                    self.screenBuffer[((7-j) + posx) as usize][(posy + i) as usize] =  WHITE;
+                }
+            }
+        }
     }
 
     // Add val to current Vx and store it in Vx
@@ -265,9 +298,24 @@ impl Cpu
         };
     }
 
+    // Jump instruction
     fn JMP(&mut self, val:u16)
     {
         self.PC = val;
+    }
+
+    // Getting the current screen buffer
+    pub fn getScreenBuffer(&mut self) -> Vec<Vec<[f32;4]>>
+    {
+        let mut tmpBuffer:Vec<Vec<[f32;4]>> = vec![vec![[0.1,0.1,0.1,1.0];32];64];
+        for i in 0..64
+        {
+            for j in 0..32
+            {
+                tmpBuffer[i as usize][j as usize] = self.screenBuffer[i as usize][j as usize];
+            }
+        }
+        return tmpBuffer;
     }
 }
 

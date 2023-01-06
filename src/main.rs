@@ -1,33 +1,50 @@
+// Importing all useful modules
 mod chip8;
 use chip8::cpu::Cpu;
 use chip8::gpu::gpu;
 
-extern crate glutin_window;
-extern crate graphics;
-extern crate opengl_graphics;
-extern crate piston;
-
-use glutin_window::GlutinWindow as Window;
-use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
-use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
-use piston::window::WindowSettings;
+use piston::input::{RenderEvent, UpdateEvent};
 
+// Pixel Size 
+const SIZE_FACTOR:u32 = 4;
+
+// If outputing log to console
+const DEBUG:bool = false;
+
+// Main entry point
 fn main() 
 {
+    // The instance of the CPU
     let mut cpu = Cpu::new();
-    let mut gpu = gpu::new(4);
 
+    // The instance of the GPU
+    let mut gpu = gpu::new(SIZE_FACTOR);
+
+    // Handling events
     let mut events = Events::new(EventSettings::new());
-    while let Some(e) = events.next(&mut gpu.window) {
-        if let Some(args) = e.render_args() {
-            // app.render(&args);
+    while let Some(e) = events.next(&mut gpu.window)
+    {
+        // Render graphics
+        if let Some(args) = e.render_args() 
+        {
+            gpu.render(&args);
         }
 
-        if let Some(args) = e.update_args() {
-            // app.update(&args);
+
+        // Update graphics logic 
+        if let Some(args) = e.update_args() 
+        {
+            gpu.update(cpu.getScreenBuffer());
         }
 
+        // CPU step
         cpu.run();
+
+        // For debugging
+        if DEBUG == true
+        {
+            cpu.debuggerStep();
+        }
     }
 }
