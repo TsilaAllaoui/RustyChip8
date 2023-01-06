@@ -32,7 +32,11 @@ pub struct Cpu
     currOpcode:u16,
 
     // The screen buffer
-    screenBuffer:Vec<Vec<[f32;4]>>
+    screenBuffer:Vec<Vec<[f32;4]>>,
+
+    // Timers
+    DT:u16,
+    ST:u16
 }
 
 // All CPU methods
@@ -42,7 +46,8 @@ impl Cpu
     pub fn new() -> Cpu
     {
         // Read rom file
-        let mut rom = match std::fs::File::open("C:/Users/735/Desktop/RustyChip8/roms/maze.ch8") 
+        // let mut rom = match std::fs::File::open("C:/Users/735/Desktop/RustyChip8/roms/maze.ch8") 
+        let mut rom = match std::fs::File::open("C:/Users/735/Desktop/RustyChip8/roms/Particle Demo [zeroZshadow, 2008].ch8") 
         {
             // If the file was successfully opened, return the file object
             Ok(rom) => rom,
@@ -100,12 +105,14 @@ impl Cpu
         {
             PC:0x200,
             SP:0,
-            Stack:vec![0;16],
+            Stack:vec![0],
             RAM:_RAM,
             Registers:vec![0;16],
             I:0,
             currOpcode:0,
-            screenBuffer:vec![vec![[0.1,0.1,0.1,1.0];32];68]
+            screenBuffer:vec![vec![[0.1,0.1,0.1,1.0];32];68],
+            DT:0,
+            ST:0
         };
         
         return _cpu;
@@ -146,8 +153,17 @@ impl Cpu
            // For the 0x1FFF opcode
            0x1000 => self.JMP(self.currOpcode & 0x0FFF),
 
+           // For the 0x2FFF opcode
+           0x2000 => self.CALL(self.currOpcode & 0x0FFF),
+
            // For the 0x3FFF opcodes
            0x3000 => self.SE_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
+
+           // For the 0x4FFF opcode
+           0x4000 => self.SNE_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
+
+           // For the 0x4FFF opcode
+           0x5000 => self.SE_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
 
            // For the 0x6FFF opcodes
            0x6000 => self.LD_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
@@ -155,8 +171,36 @@ impl Cpu
            // For the 0x7FFF opcodes
            0x7000 => self.ADD_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
 
+           // For the 0x8FFF opcode
+           0x8000 => 
+           {
+                match self.currOpcode & 0x000F
+                {
+                    0x0000 => self.LD_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+                    0x0001 => self.OR_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+                    0x0002 => self.AND_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+                    0x0003 => self.XOR_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+                    0x0004 => self.ADD_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+                    0x0005 => self.SUB_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+                    0x0006 => self.SHR_Vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                    0x0007 => self.SUBN_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+                    0x000E => self.SHL_Vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                    _ =>
+                    {
+                        println!("Not implemented opcode: {:#04x}", self.currOpcode);
+                        std::process::exit(1);
+                    } 
+                }
+           }
+
+           // For the 0x9FFF opcode
+           0x9000 => self.SNE_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8, ((self.currOpcode & 0x00F0) >> 4) as u8),
+
            // For the 0xAFFF opcodes
            0xA000 => self.LD_I(self.currOpcode & 0x0FFF),
+
+           // For the 0xBFFF opcodes
+           0xB000 => self.JP_V0(self.currOpcode & 0x0FFF),
 
            // For the 0xCFFF opcodes
            0xC000 => self.RND_Vx(((self.currOpcode & 0x0F00) >> 8) as u8, (self.currOpcode & 0x00FF) as u8),
@@ -165,6 +209,63 @@ impl Cpu
            0xD000 => self.DRW_Vx_Vy(((self.currOpcode & 0x0F00) >> 8) as u8,
                                     ((self.currOpcode & 0x00F0) >> 4) as u8,
                                     (self.currOpcode & 0x000F) as u8),
+
+            // For the 0xEFFF opcodes
+           0xE000 => 
+           {
+            match self.currOpcode & 0x00F0 
+            {
+                0x0090 => self.SKP_vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                0x00A0 => self.SKNP_vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                _ =>
+                {
+                    println!("Not implemented opcode: {:#04x}", self.currOpcode);
+                    std::process::exit(1);
+                } 
+            }
+           }
+
+            // For the 0xFFFF opcodes
+            0xF000 => 
+            {
+                match self.currOpcode & 0x00F0 
+                {
+                    0x0000 =>
+                    {
+                        match self.currOpcode & 0x000F
+                        {
+                            0x0007 => self.LD_Vx_DT(((self.currOpcode & 0x0F00) >> 8) as u8), 
+                            0x000A => self.LD_Vx_k(((self.currOpcode & 0x0F00) >> 8) as u8),
+                            _ =>
+                            {
+                                println!("Not implemented opcode: {:#04x}", self.currOpcode);
+                                std::process::exit(1);
+                            }
+                        } 
+                    }
+                    0x0010 =>
+                    {
+                        match self.currOpcode & 0x000F 
+                        {
+                            0x0005 => self.LD_DT_Vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                            0x0008 => self.LD_ST_Vx(((self.currOpcode & 0x0F00) >> 8) as u8), 
+                            0x000E => self.ADD_I_Vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                            _ =>
+                            {
+                                println!("Not implemented opcode: {:#04x}", self.currOpcode);
+                                std::process::exit(1);
+                            } 
+                        }
+                    },
+
+                    0x0020 => self.LD_F_Vx(),
+                    0x0030 => self.LD_B_Vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                    0x0050 => self.LD__I__Vx(((self.currOpcode & 0x0F00) >> 8) as u8),
+                    0x0060 => self.LD__Vx__I(((self.currOpcode & 0x0F00) >> 8) as u8),
+
+                    _ => {}
+                }
+            },
 
             _ => 
             {
@@ -205,17 +306,23 @@ impl Cpu
     // Clearing screen
     fn CLS(&mut self)
     {
-        self.screenBuffer = vec![vec![[0.0,0.0,0.0,1.0];32];68]
+        self.screenBuffer = vec![vec![[0.1,0.1,0.1,1.0];32];68]
     }
 
     // Return from subroutine
     fn RET(&mut self)
     {
-        let currStackVal = self.Stack[self.SP as usize];
-        if currStackVal != 0
-        {
-            self.PC = currStackVal;
-        }
+        self.PC = self.Stack[(self.Stack.len() - 1) as usize];
+        self.Stack.pop();
+        self.SP = self.SP - 1;
+    }
+
+    // Call subroutine at the given adress
+    fn CALL(&mut self, adress:u16)
+    {
+        self.Stack.push(self.PC);
+        self.PC = adress;
+        self.SP = self.SP + 1;
     }
 
     // Loading value in register
@@ -238,10 +345,28 @@ impl Cpu
         self.Registers[index as usize] = randomVal & val;
     }
 
-    // Check if Vx is equal to val and increment PC by 2
+    // Check if Vx is equal to val and increment PC by 2 if this is true
     fn SE_Vx(&mut self, index:u8, val:u8)
     {
         if self.Registers[index as usize] == val
+        {
+            self.PC = self.PC + 2;
+        }
+    }
+
+    // Check if Vx is not equal to val and increment PC by 2 if this is true
+    fn SNE_Vx(&mut self, index:u8, val:u8)
+    {
+        if self.Registers[index as usize] != val
+        {
+            self.PC = self.PC + 2;
+        }
+    }
+
+    // Check if Vx is not equal to Vy and increment PC by 2 if this is true
+    fn SE_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        if self.Registers[x as usize] == self.Registers[y as usize]
         {
             self.PC = self.PC + 2;
         }
@@ -304,6 +429,195 @@ impl Cpu
         self.PC = val;
     }
 
+    // Setting Vx to the value of DT
+    fn LD_Vx_DT(&mut self, index:u8)
+    {
+        self.Registers[index as usize] = self.DT as u8;
+    }
+
+    // Wait for keypress ans set the value of the key to Vx
+    fn LD_Vx_k(&mut self, index:u8)
+    {
+        let key = 0;
+        self.Registers[index as usize] = key;
+    }
+
+    // Add the content of Vx to I and store it in I
+    fn ADD_I_Vx(&mut self, index:u8)
+    {
+        self.I = self.I + self.Registers[index as usize] as u16;
+    }
+
+    // Store the content of Vx to DT
+    fn LD_DT_Vx(&mut self, index:u8)
+    {
+        self.DT = self.Registers[index as usize] as u16;
+    }
+
+    // Store the content of Vx to DT
+    fn LD_ST_Vx(&mut self, index:u8)
+    {
+        self.ST = self.Registers[index as usize] as u16;
+    }
+
+    // Add Vx and Vy and store it in Vx, Vf is set if overflow
+    fn ADD_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        let val:u16 = self.Registers[x as usize] as u16 + self.Registers[y as usize] as u16;
+        if val > 0xFF
+        {
+            self.Registers[15] = 1;
+        }
+        else
+        {
+            self.Registers[15] = 0;
+        } 
+        self.Registers[x as usize] = (val & 0xFF) as u8;
+    } 
+
+    // Loading value of Vy in Vx
+    fn LD_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        self.Registers[x as usize] = self.Registers[y as usize];
+    }
+
+    // Logical OR value of Vy with Vx and store it in Vx
+    fn OR_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        self.Registers[x as usize] = self.Registers[x as usize] | self.Registers[y as usize];
+    }
+
+    // Logical XOR value of Vy with Vx and store it in Vx
+    fn XOR_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        self.Registers[x as usize] = self.Registers[x as usize] ^ self.Registers[y as usize];
+    }
+
+    // Logical AND value of Vy with Vx and store it in Vx
+    fn AND_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        self.Registers[x as usize] = self.Registers[x as usize] & self.Registers[y as usize];
+    }
+
+    // Substract value of Vy to Vx and store it in Vx, set Vf accordingly
+    fn SUB_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        if  self.Registers[x as usize] >  self.Registers[y as usize]
+        {
+            self.Registers[15] = 1;
+        }
+        else 
+        {
+            self.Registers[15] = 0;
+        }
+
+        self.Registers[x as usize] = self.Registers[x as usize] - self.Registers[y as usize];
+    }
+
+    // Substract value of Vx to Vy and store it in Vx, set Vf accordingly
+    fn SUBN_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        if  self.Registers[x as usize] <  self.Registers[y as usize]
+        {
+            self.Registers[15] = 1;
+        }
+        else 
+        {
+            self.Registers[15] = 0;
+        }
+        
+        self.Registers[x as usize] = self.Registers[y as usize] - self.Registers[x as usize];
+    }
+
+    // Shift right Vx
+    fn SHR_Vx(&mut self, x:u8)
+    {
+        let val = self.Registers[x as usize] & 0b00000001;
+
+        if val == 1
+        {
+            self.Registers[15] = 1;
+        }
+
+        else 
+        {
+            self.Registers[15] = 0;
+        }
+        
+        self.Registers[x as usize] = self.Registers[x as usize] >> 1;
+    }
+
+    // Shift left Vx
+    fn SHL_Vx(&mut self, x:u8)
+    {
+        let val = self.Registers[x as usize] & 0b10000000;
+
+        if val == 1
+        {
+            self.Registers[15] = 1;
+        }
+
+        else 
+        {
+            self.Registers[15] = 0;
+        }
+        
+        self.Registers[x as usize] = self.Registers[x as usize] << 1;
+    }
+
+    // Skip next instruction if Vx != Vy
+    fn SNE_Vx_Vy(&mut self, x:u8, y:u8)
+    {
+        if self.Registers[x as usize] != self.Registers[y as usize]
+        {
+            self.PC = self.PC + 2;
+        }
+    }
+
+    // Jump to location adress + V0
+    fn JP_V0(&mut self, adress:u16)
+    {
+        self.PC = adress + self.Registers[0] as u16; 
+    }
+
+    // Skip next instruction if key with the value of Vx is pressed
+    fn SKP_vx(&mut self, index:u8)
+    {
+        //TODO
+    }
+    
+    // Skip next instruction if key with the value of Vx is pressed
+    fn SKNP_vx(&mut self, index:u8)
+    {
+        //TODO
+    }
+
+    // BDC
+    fn LD_B_Vx(&mut self, index:u8)
+    {
+        self.RAM[self.I as usize] = (self.Registers[index as usize] / 100) as u8;
+        self.RAM[(self.I + 1) as usize] = ((self.Registers[index as usize] % 100) / 10) as u8;
+        self.RAM[(self.I + 2) as usize] = (self.Registers[index as usize] % 10) as u8;
+    }
+
+    // Copy regiters V0 to Vx values to memory starting at I
+    fn LD__I__Vx(&mut self, index:u8)
+    {
+        for i in 0..(index+1)
+        {
+            self.RAM[(self.I + i as u16) as usize] = self.Registers[i as usize];
+        }
+    }
+
+    // Load regiters V0 to Vx values from memory starting at I
+    fn LD__Vx__I(&mut self, index:u8)
+    {
+        for i in 0..(index+1)
+        {
+            self.Registers[i as usize] = self.RAM[(self.I + i as u16) as usize];
+        }
+    }
+
     // Getting the current screen buffer
     pub fn getScreenBuffer(&mut self) -> Vec<Vec<[f32;4]>>
     {
@@ -316,6 +630,15 @@ impl Cpu
             }
         }
         return tmpBuffer;
+    }
+
+
+
+
+
+    fn LD_F_Vx(&mut self)
+    {
+        // TODO
     }
 }
 
