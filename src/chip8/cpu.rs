@@ -703,6 +703,12 @@ impl Cpu
         return tmpBuffer;
     }
 
+    // Update keys
+    pub fn updateKeys(&mut self, keys:[bool;16])
+    {
+        self.keys = keys;
+    }
+
     fn LD_F_Vx(&mut self)
     {
         // TODO

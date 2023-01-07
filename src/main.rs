@@ -14,19 +14,13 @@ const SIZE_FACTOR:u32 = 4;
 const WIDTH: usize = 64 * SIZE_FACTOR as usize;
 const HEIGHT: usize = 32 * SIZE_FACTOR as usize;
 
-// Key event
-struct KeyCharCallback;
-
-impl InputCallback for KeyCharCallback {
-    fn add_char(&mut self, c: u32) {
-        println!("add_char {}", c);
-    }
-}
-
 // Main entry point
 fn main() 
 {
-    // TO know whether a Rom file is loaded or not
+    // The keys for input
+    let mut keys:[bool;16] = [false;16]; 
+
+    // To know whether a Rom file is loaded or not
     let mut start:bool = false;
 
     // Instance of the CPU
@@ -44,9 +38,6 @@ fn main()
         },
     )
     .expect("Unable to Open Window");
-
-    // Setting key callback
-    window.set_input_callback(Box::new(KeyCharCallback {}));
 
     // Menu
     let mut menu = Menu::new("File").unwrap();
@@ -97,13 +88,64 @@ fn main()
             cpu.run();
         }
         
-        // Key event handler
+        // Get pressed keys
+        let mut wasPressed = false;
         window.get_keys().iter().for_each(|key| match key 
         {
-            Key::W => println!("holding w!"),
-            Key::T => println!("holding t!"),
+            Key::NumPad0 => { keys[0] = true; wasPressed = true; },
+            Key::NumPad1 => { keys[1] = true; wasPressed = true; },
+            Key::NumPad2 => { keys[2] = true; wasPressed = true; },
+            Key::NumPad3 => { keys[3] = true; wasPressed = true; },
+            Key::NumPad4 => { keys[4] = true; wasPressed = true; },
+            Key::NumPad5 => { keys[5] = true; wasPressed = true; },
+            Key::NumPad6 => { keys[6] = true; wasPressed = true; },
+            Key::NumPad7 => { keys[7] = true; wasPressed = true; },
+            Key::NumPad8 => { keys[8] = true; wasPressed = true; },
+            Key::NumPad9 => { keys[9] = true; wasPressed = true; },
+            Key::A => { keys[10] = true ; wasPressed = true; },
+            Key::B => { keys[11] = true ; wasPressed = true; },
+            Key::C => { keys[12] = true ; wasPressed = true; },
+            Key::D => { keys[13] = true ; wasPressed = true; },
+            Key::E => { keys[14] = true ; wasPressed = true; },
+            Key::F => { keys[15] = true ; wasPressed = true; },
             _ => (),
         });
+
+        if wasPressed == true
+        {
+            cpu.updateKeys(keys);
+            // continue;
+        }
+
+
+        // Get released keys
+        let mut wasReleased = false;
+        window.get_keys_released().iter().for_each(|key| match key 
+        {
+            Key::NumPad0 => { keys[0] = false; wasReleased = true; },
+            Key::NumPad1 => { keys[1] = false; wasReleased = true; },
+            Key::NumPad2 => { keys[2] = false; wasReleased = true; },
+            Key::NumPad3 => { keys[3] = false; wasReleased = true; },
+            Key::NumPad4 => { keys[4] = false; wasReleased = true; },
+            Key::NumPad5 => { keys[5] = false; wasReleased = true; },
+            Key::NumPad6 => { keys[6] = false; wasReleased = true; },
+            Key::NumPad7 => { keys[7] = false; wasReleased = true; },
+            Key::NumPad8 => { keys[8] = false; wasReleased = true; },
+            Key::NumPad9 => { keys[9] = false; wasReleased = true; },
+            Key::A => { keys[10] = false ; wasReleased = true; },
+            Key::B => { keys[11] = false ; wasReleased = true; },
+            Key::C => { keys[12] = false ; wasReleased = true; },
+            Key::D => { keys[13] = false ; wasReleased = true; },
+            Key::E => { keys[14] = false ; wasReleased = true; },
+            Key::F => { keys[15] = false ; wasReleased = true; },
+            _ => (),
+        });
+
+        if wasReleased == true
+        {
+            cpu.updateKeys(keys);
+            // continue;
+        }
 
          // We unwrap here as we want this code to exit if it fails
          window.update_with_buffer(&(cpu.getScreenBufferAsVec()), 64, 32).unwrap();
