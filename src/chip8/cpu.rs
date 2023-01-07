@@ -1,11 +1,10 @@
 // Importing useful modules
 use std::{io::Read, ops::Add, vec};
 use rand::{Rng, thread_rng};
-use crate::gpu;
 
 // Colors
-const BLACK:[f32;4] = [0.0,0.0,0.0,1.0];
-const WHITE:[f32;4] = [1.0,1.0,1.0,1.0];
+const BLACK:u32 = 0;
+const WHITE:u32 = 0xFFFFFF;
 
 // The CPU of the Chip8
 pub struct Cpu
@@ -32,7 +31,7 @@ pub struct Cpu
     currOpcode:u16,
 
     // The screen buffer
-    screenBuffer:Vec<Vec<[f32;4]>>,
+    screenBuffer:Vec<Vec<u32>>,
 
     // Timers
     DT:u16,
@@ -134,7 +133,7 @@ impl Cpu
             Registers:vec![0;16],
             I:0,
             currOpcode:0,
-            screenBuffer:vec![vec![[0.1,0.1,0.1,1.0];32];68],
+            screenBuffer:vec![vec![0;32];68],
             DT:0,
             ST:0,
             keys:[false;16]
@@ -335,7 +334,7 @@ impl Cpu
     // Clearing screen
     fn CLS(&mut self)
     {
-        self.screenBuffer = vec![vec![[0.0,0.0,0.0,1.0];32];68]
+        self.screenBuffer = vec![vec![0;32];68]
     }
 
     // Return from subroutine
@@ -671,30 +670,34 @@ impl Cpu
         self.keys[i] = val;
     }
 
-    // Getting the current screen buffer
-    pub fn getScreenBuffer(&mut self) -> Vec<Vec<[f32;4]>>
-    {
-        let mut tmpBuffer:Vec<Vec<[f32;4]>> = vec![vec![[0.1,0.1,0.1,1.0];32];64];
-        for i in 0..64
-        {
-            for j in 0..32
-            {
-                tmpBuffer[i as usize][j as usize] = self.screenBuffer[i as usize][j as usize];
-            }
-        }
-        return tmpBuffer;
-    }
+    // // Getting the current screen buffer
+    // pub fn getScreenBuffer(&mut self) -> Vec<Vec<[f32;4]>>
+    // {
+    //     let mut tmpBuffer:Vec<Vec<[f32;4]>> = vec![vec![[0.1,0.1,0.1,1.0];32];64];
+    //     for i in 0..64
+    //     {
+    //         for j in 0..32
+    //         {
+    //             tmpBuffer[i as usize][j as usize] = self.screenBuffer[i as usize][j as usize];
+    //         }
+    //     }
+    //     return tmpBuffer;
+    // }
 
     // Getting the current screen buffer
     pub fn getScreenBufferAsVec(&mut self) -> Vec<u32>
     {
         let mut tmpBuffer:Vec<u32> = vec![0;64 * 32];
-        for i in 0..64
+        // let mut tmp:Vec<Vec<u32>> = self.screenBuffer.clone();
+        // tmpBuffer = tmp
+        //                 .into_iter()
+        //                 .flatten()
+        //                 .collect::<Vec<u32>>();
+        for i in 0..32
         {
-            for j in 0..32
+            for j in 0..64
             {
-                let a = self.screenBuffer[i as usize][j as usize];
-                tmpBuffer[i as usize + (j * 64) as usize] = ((a[0] as u32 * 255) << 16) | ((a[1] as u32 * 255) << 8) | (a[2] as u32 * 255);
+                tmpBuffer[i * 64 + j] = self.screenBuffer[j][i];
             }
         }
         return tmpBuffer;

@@ -1,96 +1,7 @@
 // Importing all useful modules
 mod chip8;
 use chip8::cpu::Cpu;
-use chip8::gpu::gpu;
 
-use piston::Event;
-use piston::event_loop::{EventSettings, Events};
-use piston::input::*;
-use piston::input::keyboard;
-
-/*// Pixel Size 
-const SIZE_FACTOR:u32 = 4;
-
-// If outputing log to console
-const DEBUG:bool = false;
-
-// Buttons
-const BUTTONS:[keyboard::Key;16] = [
-                                    keyboard::Key::NumPad0,
-                                    keyboard::Key::NumPad1,
-                                    keyboard::Key::NumPad2,
-                                    keyboard::Key::NumPad3,
-                                    keyboard::Key::NumPad4,
-                                    keyboard::Key::NumPad5,
-                                    keyboard::Key::NumPad6,
-                                    keyboard::Key::NumPad7,
-                                    keyboard::Key::NumPad8,
-                                    keyboard::Key::NumPad9,
-                                    keyboard::Key::A,
-                                    keyboard::Key::B,
-                                    keyboard::Key::C,
-                                    keyboard::Key::D,
-                                    keyboard::Key::E,
-                                    keyboard::Key::F
-                                   ];
-
-// Main entry point
-fn main() 
-{ 
-    // The instance of the CPU
-    let mut cpu = Cpu::new();
-
-    // The instance of the GPU
-    let mut gpu = gpu::new(SIZE_FACTOR);
-
-    // Handling events
-    let mut events = Events::new(EventSettings::new());
-    while let Some(e) = events.next(&mut gpu.window)
-    {
-        // Render graphics
-        if let Some(args) = e.render_args() 
-        {
-            gpu.render(&args);
-        }
-
-
-        // Update graphics logic 
-        if let Some(args) = e.update_args() 
-        {
-            gpu.update(cpu.getScreenBuffer());
-        }
-
-        // Keyboard events
-        if let Event::Input(input, _) = e
-        {
-            if let Input::Button(button_args) = input
-            {
-                if let Button::Keyboard(key) = button_args.button
-                {
-                    for i in 0..BUTTONS.len()
-                    {
-                        if key == BUTTONS[i]
-                        {
-                            cpu.setKeys(i as usize, if button_args.state == ButtonState::Press {true} else {true});
-                        }
-                    }
-                }
-            }
-        }
-
-
-        // CPU step
-        cpu.run();
-
-        // For debugging
-        if DEBUG == true
-        {
-            cpu.debuggerStep();
-        }
-    }
-}*/
-
-use minifb::MENU_KEY_CTRL;
 use minifb::{InputCallback, Key, Menu, Scale, Window, WindowOptions};
 use std::env;
 use std::*;
@@ -99,15 +10,11 @@ use rfd;
 // Pixel Size 
 const SIZE_FACTOR:u32 = 4;
 
+// Window size
 const WIDTH: usize = 64 * SIZE_FACTOR as usize;
 const HEIGHT: usize = 32 * SIZE_FACTOR as usize;
 
-const OTHER_MENU_ID: usize = 2;
-const COLOR_0_ID: usize = 3;
-const COLOR_1_ID: usize = 4;
-const COLOR_2_ID: usize = 5;
-const CLOSE_MENU_ID: usize = 6;
-
+// Key event
 struct KeyCharCallback;
 
 impl InputCallback for KeyCharCallback {
@@ -116,17 +23,14 @@ impl InputCallback for KeyCharCallback {
     }
 }
 
+// Main entry point
 fn main() 
 {
-
-    let mut filePath:String = String::from("");
+    // TO know whether a Rom file is loaded or not
     let mut start:bool = false;
 
+    // Instance of the CPU
     let mut cpu:Cpu = Cpu::new(String::from(""));
-    // let mut gpu:gpu;
-
-    // The buffer to display in window
-    let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
 
     // Creating window
     let mut window = Window::new(
@@ -160,15 +64,6 @@ fn main()
     // Main Loop
     while window.is_open() && !window.is_key_down(Key::Escape) 
     {
-        // // Updating buffer values and render it
-        // for y in 0..HEIGHT 
-        // {
-        //     for x in 0..WIDTH 
-        //     {
-        //         buffer[(y * WIDTH) + x] = 0x00FF00 as u32;
-        //     }
-        // }
-
         // Menu clicked event
         if let Some(menu_id) = window.is_menu_pressed() 
         {
@@ -182,17 +77,11 @@ fn main()
                         .add_filter("Chip8 Rom File", &["ch8"])
                         .set_directory(&path)
                         .pick_file()
-                        {
-                            filePath = res.as_path().display().to_string();
-                            // The instance of the CPU
-                            let s = filePath.clone();
-                            cpu = Cpu::new(s);
-
-                            // The instance of the GPU
-                            // gpu = gpu::new(SIZE_FACTOR);
-
-                            start = true;
-                        }
+                    {
+                        // Creating new CPU instance with the Rom file loaded in
+                        cpu = Cpu::new(res.as_path().display().to_string());
+                        start = true;
+                    }
                     else 
                     {
                         std::process::exit(1);    
@@ -202,12 +91,13 @@ fn main()
             }
         }
 
+        // If a Rom file is loaded in the memory, step the CPU
         if start == true
         {
-            // CPU step
             cpu.run();
         }
         
+        // Key event handler
         window.get_keys().iter().for_each(|key| match key 
         {
             Key::W => println!("holding w!"),
@@ -215,8 +105,7 @@ fn main()
             _ => (),
         });
 
-        // We unwrap here as we want this code to exit if it fails
-        let buff = cpu.getScreenBufferAsVec();
-        window.update_with_buffer(&buff, 64, 32).unwrap();
+         // We unwrap here as we want this code to exit if it fails
+         window.update_with_buffer(&(cpu.getScreenBufferAsVec()), 64, 32).unwrap();
     }
 }
