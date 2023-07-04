@@ -644,7 +644,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustyChip8"
+name = "rusty_chip_8"
 version = "0.1.0"
 dependencies = [
  "minifb",
