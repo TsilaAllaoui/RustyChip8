@@ -70,4 +70,42 @@ impl Gpu {
     pub fn update(&mut self, screen_buffer: Vec<Vec<[f32; 4]>>) {
         self.screen = screen_buffer;
     }
+
+    // Update part of screen from changes data
+    pub fn update_part(&mut self, data: &(u8, u8, u8, Vec<u8>), &args: &RenderArgs) {
+        use graphics::*;
+
+        // A square here represents a pixel
+        let square = rectangle::square(0.0, 0.0, self.size_factor as f64);
+
+        let mut i = 0;
+
+        // Looping througth height
+        for byte in &data.3 {
+            // Looping throught columns of 8 pixels (each bit is a pixel, 1 = black, 0 = white)
+            for j in (0..8).rev() {
+                let a = byte & (1 << j);
+                let y = ((7 - j) + data.1) as f64;
+                let x = (data.0 + i) as f64;
+                if (a >> j) == 1 {
+                    self.gl.draw(args.viewport(), |c, gl| {
+                        // Looping througth all pixel and render it
+                        let transform = c
+                            .transform
+                            .trans(x * self.size_factor as f64, y * self.size_factor as f64);
+                        rectangle([0.0, 0.0, 0.0, 0.0], square, transform, gl);
+                    });
+                } else {
+                    self.gl.draw(args.viewport(), |c, gl| {
+                        // Looping througth all pixel and render it
+                        let transform = c
+                            .transform
+                            .trans(x * self.size_factor as f64, y * self.size_factor as f64);
+                        rectangle([1.0, 1.0, 1.0, 1.0], square, transform, gl);
+                    });
+                }
+            }
+            i += 1;
+        }
+    }
 }

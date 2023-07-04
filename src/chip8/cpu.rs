@@ -38,6 +38,12 @@ pub struct Cpu {
 
     // Keys
     keys: [bool; 16],
+
+    // For the rendering of a region of the screen on update
+    posx: u8,
+    posy: u8,
+    data: u8,
+    bytes: Vec<u8>,
 }
 
 // All CPU methods
@@ -102,9 +108,26 @@ impl Cpu {
             delta_timer: 0,
             sub_timer: 0,
             keys: [false; 16],
+
+            posx: 0,
+            posy: 0,
+            data: 0,
+            bytes: vec![],
         };
 
         return _cpu;
+    }
+
+    // Get screenbuffer changes data
+    pub fn get_screen_changes_data(&self) -> (u8, u8, u8, Vec<u8>) {
+        (self.posx, self.posy, self.data, self.bytes.clone())
+    }
+
+    pub fn set_screen_changes_data(&mut self, data: (u8, u8, u8), bytes: Vec<u8>) {
+        self.posx = data.0;
+        self.posx = data.1;
+        self.posx = data.2;
+        self.bytes = bytes;
     }
 
     // A CPU step
@@ -347,28 +370,32 @@ impl Cpu {
     // For drawing on screen
     fn drw_vx_vy(&mut self, x: u8, y: u8, n: u8) {
         // Position where to begin rendering the curretn sprite
-        let posx = self.registers[x as usize];
-        let posy = self.registers[y as usize];
+        self.posx = self.registers[x as usize];
+        self.posy = self.registers[y as usize];
 
         // For checking collision (TODO: add collision check)
         self.registers[15] = 0;
 
-        // Looping througth hight
+        // Looping througth height
         for i in 0..n {
             // Getting the current byte pointed at I + current row
             let adress: u16 = self.i_register + i as u16;
             let byte = self.ram[adress as usize];
 
-            // Looping throught columns of 8 pixels (each bit is a pixel, 1 = black, 0 = white)
-            for j in (0..8).rev() {
-                let a = byte & (1 << j);
-                if (a >> j) == 1 {
-                    self.screen_buffer[((7 - j) + posx) as usize][(posy + i) as usize] = BLACK;
-                } else {
-                    self.screen_buffer[((7 - j) + posx) as usize][(posy + i) as usize] = WHITE;
-                }
-            }
+            self.bytes.push(byte);
+
+            // // Looping throught columns of 8 pixels (each bit is a pixel, 1 = black, 0 = white)
+            // for j in (0..8).rev() {
+            //     let a = byte & (1 << j);
+            //     if (a >> j) == 1 {
+            //         self.screen_buffer[((7 - j) + posx) as usize][(posy + i) as usize] = BLACK;
+            //     } else {
+            //         self.screen_buffer[((7 - j) + posx) as usize][(posy + i) as usize] = WHITE;
+            //     }
+            // }
         }
+
+        self.set_screen_changes_data((self.posx, self.posy, n), self.bytes.clone());
     }
 
     // Add val to current Vx and store it in Vx
@@ -549,7 +576,7 @@ impl Cpu {
     }
 
     // Getting the current screen buffer
-    pub fn get_scree_buffer(&mut self) -> Vec<Vec<[f32; 4]>> {
+    pub fn get_screen_buffer(&mut self) -> Vec<Vec<[f32; 4]>> {
         let mut tmp_buffer: Vec<Vec<[f32; 4]>> = vec![vec![[0.1, 0.1, 0.1, 1.0]; 32]; 64];
         for i in 0..64 {
             for j in 0..32 {
