@@ -1,12 +1,12 @@
 [package]
-name = "rustyChip8"
+name = "rustychip_8"
 version = "0.1.0"
 edition = "2021"
 authors = ["TsilaAllaoui"]
 
 [dependencies]
-rand="0.3.14"
-piston = "0.53.0"
+rand="0.8.5"
+piston = "0.53.2"
 piston2d-graphics = "0.43.0"
-pistoncore-glutin_window = "0.70.1"
+pistoncore-glutin_window = "0.71.0"
 piston2d-opengl_graphics = "0.82.0"
